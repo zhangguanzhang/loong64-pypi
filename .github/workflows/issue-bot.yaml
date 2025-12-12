@@ -1,0 +1,65 @@
+name: Trigger on Issue
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: read
+  actions: write
+
+jobs:
+  parse_and_trigger:
+    runs-on: ubuntu-latest
+    # if: github.repository_owner == 'Loongson-Cloud-Community'
+    steps:
+      - name: Extract package name & version from issue title
+        id: extract
+        run: |
+          title="${{ github.event.issue.title }}"
+          echo "Issue title: $title"
+
+          pkg="$(echo "$title" | awk '{print $1}')"
+          ver="$(echo "$title" | grep -oE 'v?[0-9]+\.[0-9]+\.[0-9]+')"
+
+          if [ -z "$ver" ]; then
+            ver="latest"
+          fi
+
+          echo "package=$pkg" >> $GITHUB_OUTPUT
+          echo "version=$ver" >> $GITHUB_OUTPUT
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Check if workflow file exists
+        id: check
+        run: |
+          file=".github/workflows/${{ steps.extract.outputs.package }}.yaml"
+          echo "Checking file: $file"
+
+          if [ -f "$file" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "workflow_file=$file" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Trigger target workflow
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: "${{ steps.check.outputs.workflow_file }}",
+              ref: "main",
+              inputs: {
+                version: "${{ steps.extract.outputs.version }}"
+              }
+            })
+
+      - name: Log skip message
+        if: steps.check.outputs.exists == 'false'
+        run: echo "Workflow for package '${{ steps.extract.outputs.package }}' not found. Skip."

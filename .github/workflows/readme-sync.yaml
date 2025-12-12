@@ -11,7 +11,7 @@ on:
 jobs:
   update-docs:
     runs-on: ubuntu-latest
-
+    if: github.repository_owner == 'Loongson-Cloud-Community'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -46,7 +46,7 @@ jobs:
             for f in $(ls .github/workflows/*.yaml | sort); do
               base=$(basename "$f")
               pkg=$(basename "$f" .yaml)
-              if [[ "$base" == "readme-sync.yaml" || "$base" == "deploy-page.yaml" ]]; then
+              if [[ "$base" == "readme-sync.yaml" || "$base" == "deploy-page.yaml" || "$base" == "issue-bot.yaml" ]]; then
                 continue
               fi
               link="$REPO_URL/blob/main/.github/workflows/$base"
